@@ -1,0 +1,18 @@
+# Log files
+cron.log
+
+# Alert history
+alert_log.json
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# OS and editor files
+.DS_Store
+*.swp
+
+# Environment files
+.env
+venv/
