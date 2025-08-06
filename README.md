@@ -80,7 +80,7 @@ Adjust true/false as needed.
 
 #### Inside `nws_alert.py`, configure:
 
-- `AREA` - your NWS zone code (See note in [Features](##Features))
+- `AREA` - your NWS zone code (See note in [Features](#Features))
 - `SLACK_WEBHOOK_URL` - your Slack Incoming Webhook URL. (See details at [docs.slack.dev](https://docs.slack.dev/slack-github-action/sending-techniques/sending-data-slack-incoming-webhook/))
 
 ### 3. Run It Manually
