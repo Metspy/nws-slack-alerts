@@ -3,7 +3,7 @@
 This script checks for active National Weather Service (NWS) alerts for a given area and sends notifications to a Slack channel when alerts of interest are issued.
 
 ## Features
-- Target area is set by NWS location zones (See a GIS map [here](https://www.arcgis.com/home/item.html?id=07ca3188d1254b4d8901f8a4283a37dd&sublayer=0) or search all zones [here](https://alerts.weather.gov/))
+- Target area is set by NWS location zones (See a GIS map [here]((https://www.arcgis.com/apps/mapviewer/index.html?layerId=0&layers=07ca3188d1254b4d8901f8a4283a37dd)) or search all zones [here](https://alerts.weather.gov/))
 - Filters alerts by type (configurable in `alert_config.json`)
 - Avoids repeat notifications with ID tracking
 - Filters out expired alerts
