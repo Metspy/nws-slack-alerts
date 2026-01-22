@@ -16,6 +16,7 @@
   "Air Quality Alert": true,
   "Red Flag Warning": true,
   "Dense Smoke Advisory": false,
+  "Dust Storm Warning": false,
   "Extreme Wind Warning": true,
   "High Wind Warning": true,
   "High Wind Watch": false,
