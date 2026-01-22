@@ -57,6 +57,7 @@ Adjust true/false as needed.
   "Air Quality Alert": true,
   "Red Flag Warning": true,
   "Dense Smoke Advisory": true,
+  "Dust Storm Warning": true,
   "Extreme Wind Warning": true,
   "High Wind Warning": true,
   "High Wind Watch": false,
