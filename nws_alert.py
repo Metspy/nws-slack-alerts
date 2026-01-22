@@ -33,6 +33,7 @@ def load_alert_type_flags():
         "Air Quality Alert": False,
         "Red Flag Warning": False,
         "Dense Smoke Advisory": False,
+        "Dust Storm Warning": False,
         "Extreme Wind Warning": False,
         "High Wind Warning": False,
         "High Wind Watch": False,
