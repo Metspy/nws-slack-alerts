@@ -1,15 +1,13 @@
 import requests
+import argparse
 import json
 from datetime import datetime, timedelta, timezone
 import os
 
-# === CONFIG ===
-BASE_DIR = "/Users/USERNAME/path/to/script" # Update!
-ALERT_LOG_FILE = os.path.join(BASE_DIR, "alert_log.json")
-ALERT_TYPE_FILE = os.path.join(BASE_DIR, "alert_config.json")
-ALERT_EXPIRY_HOURS = 12
-AREA = "INZ002"  # NWS Zone Code; see https://alerts.weather.gov/ and search land areas with codes
-SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/YOURUNIQUESLACKWEBHOOKURL"
+# === LOAD SITE CONFIG ===
+def load_site_config(config_path):
+    with open(config_path, "r") as f:
+        return json.load(f)
 
 # === LOAD ALERT TYPE CONFIG ===
 def load_alert_type_flags():
@@ -66,7 +64,7 @@ def load_alert_type_flags():
         return default_flags
 
 # === ALERT LOG ===
-def load_alert_log(filename=ALERT_LOG_FILE):
+def load_alert_log(filename, expiry_hours):
     now = datetime.now(timezone.utc)
     if not os.path.exists(filename):
         return {}
@@ -79,13 +77,13 @@ def load_alert_log(filename=ALERT_LOG_FILE):
     for aid, ts in log.items():
         try:
             t = datetime.fromisoformat(ts)
-            if now - t < timedelta(hours=ALERT_EXPIRY_HOURS):
+            if now - t < timedelta(hours=expiry_hours):
                 valid[aid] = ts
         except ValueError:
             continue
     return valid
 
-def save_alert_log(log, filename=ALERT_LOG_FILE):
+def save_alert_log(log, filename):
     with open(filename, "w") as f:
         json.dump(log, f, indent=2)
 
@@ -113,26 +111,56 @@ def send_alert_to_slack(props):
 
 # === MAIN ===
 def main():
+    parser = argparse.ArgumentParser(description="NWS Slack Alert Script")
+    parser.add_argument("--config", required=True, help="Path to site config JSON")
+    args = parser.parse_args()
+
+    config = load_site_config(args.config)
+
+    areas = config["areas"]
+    alert_expiry_hours = config.get("alert_expiry_hours", 12)
+    slack_webhook_url = os.getenv(config["webhook_env_var"])
+    if not slack_webhook_url:
+        raise ValueError("Slack webhook environment variable not set")
+    alert_type_file = config["alert_type_file"]
+    alert_log_file = config["alert_log_file"]
+
+    global ALERT_EXPIRY_HOURS
+    ALERT_EXPIRY_HOURS = alert_expiry_hours
+
+    global ALERT_TYPE_FILE
+    ALERT_TYPE_FILE = alert_type_file
+
+    global SLACK_WEBHOOK_URL
+    SLACK_WEBHOOK_URL = slack_webhook_url
+
     alert_flags = load_alert_type_flags()
-    log = load_alert_log()
-    alerts = fetch_alerts(AREA) or []
-    # print(f"[{datetime.now(timezone.utc).isoformat()}] Cron job running.") #crontab debug
+    log = load_alert_log(alert_log_file, alert_expiry_hours)
+    alerts = []
+    for area in areas:
+        alerts.extend(fetch_alerts(area) or [])
+
     for alert in alerts:
         props = alert.get("properties", {})
         aid = alert.get("id")
         event = props.get("event", "")
+
         if not alert_flags.get(event, False):
             continue
         if has_been_alerted(aid, log):
             continue
+
         exp = props.get("expires")
         if exp:
             et = datetime.fromisoformat(exp.replace("Z", "+00:00"))
             if et < datetime.now(timezone.utc):
                 continue
+
         send_alert_to_slack(props)
         mark_alert_sent(aid, log)
-    save_alert_log(log)
+
+    save_alert_log(log, alert_log_file)
+
 
 if __name__ == "__main__":
     main()
