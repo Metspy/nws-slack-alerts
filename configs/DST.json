@@ -1,0 +1,21 @@
+{
+  "areas": [
+    "AZZ534",
+    "AZZ537",
+    "AZZ538",
+    "AZZ539",
+    "AZZ540",
+    "AZZ541",
+    "AZZ542",
+    "AZZ543",
+    "AZZ544",
+    "AZZ546",
+    "AZZ548",
+    "AZZ549",
+    "AZZ551"
+  ],
+  "alert_expiry_hours": 12,
+  "alert_type_file": "configs/DST_alert_types.json",
+  "alert_log_file": "configs/DST_alert_log.json",
+  "webhook_env_var": "DST_SLACK_WEBHOOK"
+}
