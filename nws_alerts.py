@@ -27,7 +27,7 @@ def load_alert_type_flags():
         "Heat Advisory": False,
         "Excessive Heat Watch": False,
         "Extreme Heat Warning": False,
-        "Extreme Heart Watch": False,
+        "Extreme Heat Watch": False,
         "Air Quality Alert": False,
         "Red Flag Warning": False,
         "Dense Smoke Advisory": False,
