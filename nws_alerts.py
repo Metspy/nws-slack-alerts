@@ -88,11 +88,17 @@ def save_alert_log(log, filename):
     with open(filename, "w") as f:
         json.dump(log, f, indent=2)
 
-def has_been_alerted(aid, log):
-    return aid in log
+def has_been_alerted(aid, expires_iso, log):
+    """
+    Returns True only if we already alerted for THIS version
+    of the alert (same ID AND same expiration time)
+    """
+    if aid not in log:
+        return False
+    return log[aid] == expires_iso
 
-def mark_alert_sent(aid, log):
-    log[aid] = datetime.now(timezone.utc).isoformat()
+def mark_alert_sent(aid, expires_iso, log):
+    log[aid] = expires_iso
 
 # === FETCH ALERTS ===
 def fetch_alerts(area_code):
@@ -168,20 +174,26 @@ def main():
 
         if not alert_flags.get(event, False):
             continue
-        if has_been_alerted(aid, log):
+
+        # --- expiration handling ---
+        exp = props.get("expires")
+        if not exp:
             continue
 
-        exp = props.get("expires")
-        if exp:
-            et = datetime.fromisoformat(exp.replace("Z", "+00:00"))
-            if et < datetime.now(timezone.utc):
-                continue
+        exp_iso = exp.replace("Z", "+00:00")
+        et = datetime.fromisoformat(exp_iso)
 
+        # skip expired alerts
+        if et < datetime.now(timezone.utc):
+            continue
+
+        # --- duplicate suppression ---
+        if has_been_alerted(aid, exp_iso, log):
+            continue
+
+        # --- send alert ---
         send_alert_to_slack(props)
-        mark_alert_sent(aid, log)
-
-    save_alert_log(log, alert_log_file)
-    return any_fetch_success
+        mark_alert_sent(aid, exp_iso, log)
 
 
 if __name__ == "__main__":

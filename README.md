@@ -1,20 +1,22 @@
 # NWS Slack Alerts
 
-Multi-site National Weather Service (NWS) alert monitoring with Slack notifications.
-
-This project queries the NWS API for active alerts across configured zones and posts selected alert types to Slack using incoming webhooks.
-
-Designed for deployment across multiple environments using site-specific configurations.
+This project is a resilient multi-site National Weather Service alert monitoring service that posts selected alerts to Slack.
+Each monitored site runs independently with duplicate alert suppression, state tracking, and automated failure detection/recovery notifications designed for unattended operation on low-power systems (e.g., Raspberry Pi).
 
 ---
 
 ## Features
-- Target areas are set by NWS location zones (See a GIS map [here](https://geospatial-nws-noaa.opendata.arcgis.com/datasets/noaas-national-weather-service-public-forecast-zones/explore) or search all zones [here](https://alerts.weather.gov/))
-- Filters alerts by type (configurable in `AREA_alert_types.json`)
-- Avoids repeat notifications with ID tracking
-- Filters out expired alerts
-- Runs unattended via `cron`
-- Sends messages directly to Slack using environment-based webhook management
+- Multi-site monitoring using per-site configuration files
+- Filters alerts by type (configurable per site)
+- Duplicate suppression using alert ID tracking
+- Expiration filtering
+- Independent Slack routing per site
+- Operational monitoring channel for failures
+- Detects stalled or crashed scripts
+- Sends recovery notifications when service resumes
+- Designed for unattended Raspberry Pi deployment
+- No database required (filesystem state tracking)
+
 
 ## Architecture Overview
 
@@ -24,21 +26,52 @@ Designed for deployment across multiple environments using site-specific configu
 - Slack notifications are sent via incoming webhooks.
 - Alert IDs are logged locally to prevent duplicate notifications.
 
+## Process
+
+Every 2 minutes (per site):
+`run_site.sh`
+    → queries NWS API
+    → filters alerts
+    → sends Slack messages (as needed)
+    → updates logs
+    → updates heartbeat
+
+Every 1 minute:
+monitor_health.sh
+    → checks heartbeats
+    → sends OPS alert only on state change
+
+
+## Health Monitoring
+
+Each site maintains a heartbeat file: `logs/AREA.last_success`. Every successful run updates this timestamp.
+
+The monitor checks:
+    current_time - last_success > threshold
+
+If exceeded → failure alert sent to OPS channel  
+If service resumes → recovery alert sent
+
+This prevents alert spam while still notifying operators of outages.
+
+
 ## Project Structure
 
 ```
 nws-slack-alerts/
-├── configs/
+├── configs/                # Per-site alert configuration
 │   ├── DST.json
 │   ├── BNF.json
-│   ├── SGP.json
-│   ├── DST_alert_types.json      # created on first run; toggle desired alerts true/false
-│   └── DST_alert_log.json        # created on first run; tracks previously sent alerts
-├── nws_alerts.py
-├── cron.log     # Optional log of cron job output
-├── .env.example
-├── requirements.txt
-└── README.md      # you're reading this
+│   └── SGP.json
+├── logs/                   # Runtime state (auto-generated)
+│   ├── *.log
+│   ├── *.state
+│   └── *.last_success
+├── nws_alerts.py           # Main alert processor
+├── run_site.sh             # Runs one site 
+├── cleanup_logs.sh         # Pares down log volume via cron
+├── requirements.txt.       # Quick reference of requirements   
+└── monitor_health.sh       # Detects crashes/stalls and alerts Slack
 ```
 
 ## Setup Instructions
@@ -89,7 +122,9 @@ Example (`configs/DST.json`):
 #### `AREA_alert_types.json` - Toggle alerts on or off:
 
 This file is automatically created on first run if it does not exist.
-Adjust true/false as needed.
+
+>**NOTE: The first run enables all alert types as `false` by default.**
+>**You must edit this file to enable the alerts you care about.**
 
 ```json
 {
@@ -136,12 +171,31 @@ Adjust true/false as needed.
 
 #### Environment Variables
 
-Create a `.env` file with each AREA_SLACK_WEBHOOK. See details about using incoming webhooks in slack at [docs.slack.dev](https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/)
+Create a `.env` file with each AREA_SLACK_WEBHOOK. These webhooks are used to send messages to your desired slack channel. Be careful not to share your webhook! This should be stored in `.env` only. Double check that `.env` is included in `.gitignore`. 
+
+Two webhook types are used:
+
+SITE WEBHOOKS
+    Used for sending weather alerts to users
+
+OPS WEBHOOK
+    Used only for system monitoring (failures and recovery)
+
+This separation prevents operational noise from reaching end users.
+
+
+>**NOTE: If the system running the cron jobs fails or loses connectivity, no slack notification can be sent without outside heartbeat monitoring services.**
+>Failures such as these are documented in the site logs in `/logs`. See [Failure Modes](#failure-modes)
+
+See details about using incoming webhooks in slack at [docs.slack.dev](https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/)
 
 Example `.env`:
 
 ```bash
-DST_SLACK_WEBHOOK=https://hooks.slack.com/services/XXXXX/YYYYY/ZZZZZ
+DST_SLACK_WEBHOOK=https://hooks.slack.com/services/XXX/YYY/ZZZ
+BNF_SLACK_WEBHOOK=https://hooks.slack.com/services/XXX/YYY/ZZZ
+SGP_SLACK_WEBHOOK=https://hooks.slack.com/services/XXX/YYY/ZZZ
+OPS_SLACK_WEBHOOK=https://hooks.slack.com/services/XXX/YYY/ZZZ
 ```
 
 Load it:
@@ -168,24 +222,24 @@ The script will:
 
 ### 5. Run It Automatically with Cron
 
-We can use a small wrapper script to be sure the `.env` variables are gathered each time this runs on cron.
+Each site runs independently and a health monitor checks for failures.
 
-Example (`run_dst.sh`):
-
-```bash
-#!/bin/bash
-cd /path/to/nws-slack-alerts
-set -a
-source .env
-set +a
-/usr/bin/python3 nws_alerts.py --config configs/DST.json
-```
-
-Then use `crontab -e` to add a job like:
+Example crontab:
 
 ```bash
-* * * * * /path/to/run_dst.sh >> /path/to/nws-slack-alerts/cron.log 2>&1
+*/2 * * * * /your/path/to/nws-slack-alerts/run_site.sh DST
+*/2 * * * * /your/path/to/nws-slack-alerts/run_site.sh BNF
+*/2 * * * * /your/path/to/nws-slack-alerts/run_site.sh SGP
+* * * * * /your/path/to/nws-slack-alerts/monitor_health.sh
 ```
+
+The monitor sends alerts only when a state change occurs:
+- OK → FAIL (stalled or crashed)
+- FAIL → OK (recovered)
+
+Running every 2 minutes is safe because duplicate alerts are suppressed.
+The NWS API typically updates alerts on minute-scale intervals.
+Running faster increases API load without improving alert latency.
 
 >**NOTE: you may need to adjust the path to Python. To check, run:**
 >
@@ -193,13 +247,53 @@ Then use `crontab -e` to add a job like:
 >which python3
 >```
 
-This checks for alerts every minute.
+## Log Maintenance
+
+The system stores runtime state in the logs/ directory. These files grow indefinitely during long-term unattended operation and could potentially balloon quickly in the event of API failure. The included maintenance script, `cleanup_logs.sh` truncates each log to the most recent 200 lines and removes abandoned logs older than 7 days while retaining alert history, state tracking files and configuration JSONs. 
+
+Recommended cron entry (run every hour):
+
+```bash
+0 * * * * /your/path/to/nws-slack-alerts/cleanup_logs.sh
+```
 
 ## Notes
 
 - The script uses timezone-aware datetimes (UTC).
 - Alert history is tracked in `AREA_alert_log.json`. This is auto-managed.
 - Slack messages are sent **only** for alert types marked `true` in the config.
+
+## Failure Modes
+
+This system detects:
+- Python crashes
+- API failures
+- Stalled execution
+
+**This system cannot detect:**
+- Complete power loss
+- Network outage on the host machine
+
+External uptime monitoring is required for full availability monitoring.
+
+## Troubleshooting
+
+**No alerts appearing**
+- Verify alert types are enabled in `AREA_alert_types.json`
+- Run script manually and check output
+- Confirm webhook environment variables are loaded
+
+**Receiving duplicate alerts**
+- Delete `AREA_alert_log.json` once (resets history)
+
+**Monitor reports stalled**
+- Confirm cron is running
+- Check `logs/AREA.log`
+- Verify last_success timestamp updates
+
+**No failure notifications**
+- OPS_SLACK_WEBHOOK not configured
+
 
 ## Author
 
