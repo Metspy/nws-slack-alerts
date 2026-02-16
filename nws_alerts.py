@@ -130,7 +130,6 @@ def send_alert_to_slack(props):
 
 # === MAIN ===
 def main():
-    overall_success = False
     parser = argparse.ArgumentParser(description="NWS Slack Alert Script")
     parser.add_argument("--config", required=True, help="Path to site config JSON")
     args = parser.parse_args()
@@ -195,14 +194,13 @@ def main():
         send_alert_to_slack(props)
         mark_alert_sent(aid, exp_iso, log)
 
+    return True
 
 if __name__ == "__main__":
     try:
-        success = main()
-        if success:
-            exit(0)
-        else:
-            exit(2)  # ran but failed logically
+        main()
+        exit(0)
     except Exception as e:
         print(f"FATAL ERROR: {e}")
-        exit(1)  # crashed
+        exit(1)
+
