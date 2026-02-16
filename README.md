@@ -249,7 +249,7 @@ Running faster increases API load without improving alert latency.
 
 ## Log Maintenance
 
-The system stores runtime state in the logs/ directory. These files grow indefinitely during long-term unattended operation and could potentially balloon quickly in the event of API failure. The included maintenance script, `cleanup_logs.sh` truncates each log to the most recent 200 lines and removes abandoned logs older than 7 days while retaining alert history, state tracking files and configuration JSONs. 
+The system stores runtime state in the logs/ directory. These files grow indefinitely during long-term unattended operation and could potentially balloon quickly in the event of API failure. The included maintenance script, `cleanup_logs.sh` truncates each log to the most recent 2000 lines and removes abandoned logs older than 7 days while retaining alert history, state tracking files and configuration JSONs. 
 
 Recommended cron entry (run every hour):
 
