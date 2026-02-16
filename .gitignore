@@ -1,5 +1,6 @@
 # Log files
 cron.log
+logs/*.log
 
 # Alert history
 alert_log.json
@@ -16,3 +17,6 @@ __pycache__/
 # Environment files
 .env
 venv/
+
+configs/*_alert_log.json
+configs/*_alert_types.json

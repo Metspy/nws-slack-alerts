@@ -97,10 +97,15 @@ def mark_alert_sent(aid, log):
 def fetch_alerts(area_code):
     url = f"https://api.weather.gov/alerts/active?zone={area_code}"
     response = requests.get(url, headers={"User-Agent": "weather-alert-script"})
+
     if response.status_code == 200:
-        return response.json().get("features", [])
-    print(f"Error fetching alerts: HTTP {response.status_code}")
+        features = response.json().get("features", [])
+        print(f"Fetched {len(features)} active alerts for {area_code}")
+        return features
+
+    print(f"Error fetching alerts for {area_code}: HTTP {response.status_code}")
     return []
+
 
 # === SLACK ===
 def send_alert_to_slack(props):
@@ -116,6 +121,8 @@ def main():
     args = parser.parse_args()
 
     config = load_site_config(args.config)
+
+    print(f"[{datetime.now(timezone.utc).isoformat()}] Checking alerts for {args.config}")
 
     areas = config["areas"]
     alert_expiry_hours = config.get("alert_expiry_hours", 12)
