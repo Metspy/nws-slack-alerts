@@ -14,7 +14,12 @@ LOGFILE="$BASE_DIR/logs/${SITE}.log"
 
 echo "========== $(date -u) : Running $SITE ==========" >> "$LOGFILE"
 
-/opt/anaconda3/envs/nws_automation/bin/python nws_alerts.py --config "configs/${SITE}.json" >> "$LOGFILE" 2>&1
+# Run script ONCE
+if /opt/anaconda3/envs/nws_automation/bin/python nws_alerts.py --config "configs/${SITE}.json" >> "$LOGFILE" 2>&1; then
+    date +%s > "$BASE_DIR/logs/${SITE}.last_success"
+else
+    echo "Script failed at $(date)" >> "$LOGFILE"
+fi
 
 echo "" >> "$LOGFILE"
 

@@ -1,3 +1,4 @@
+#raise RuntimeError("intentional test failure")
 import requests
 import argparse
 import json
@@ -96,15 +97,22 @@ def mark_alert_sent(aid, log):
 # === FETCH ALERTS ===
 def fetch_alerts(area_code):
     url = f"https://api.weather.gov/alerts/active?zone={area_code}"
-    response = requests.get(url, headers={"User-Agent": "weather-alert-script"})
 
-    if response.status_code == 200:
+    try:
+        response = requests.get(
+            url,
+            headers={"User-Agent": "weather-alert-script"},
+            timeout=15
+        )
+        response.raise_for_status()
+
         features = response.json().get("features", [])
         print(f"Fetched {len(features)} active alerts for {area_code}")
-        return features
+        return features, True
 
-    print(f"Error fetching alerts for {area_code}: HTTP {response.status_code}")
-    return []
+    except Exception as e:
+        print(f"ERROR fetching alerts for {area_code}: {e}")
+        return [], False
 
 
 # === SLACK ===
@@ -116,6 +124,7 @@ def send_alert_to_slack(props):
 
 # === MAIN ===
 def main():
+    overall_success = False
     parser = argparse.ArgumentParser(description="NWS Slack Alert Script")
     parser.add_argument("--config", required=True, help="Path to site config JSON")
     args = parser.parse_args()
@@ -145,7 +154,12 @@ def main():
     log = load_alert_log(alert_log_file, alert_expiry_hours)
     alerts = []
     for area in areas:
-        alerts.extend(fetch_alerts(area) or [])
+        area_alerts, ok = fetch_alerts(area)
+
+        if ok:
+            any_fetch_success = True
+
+        alerts.extend(area_alerts)
 
     for alert in alerts:
         props = alert.get("properties", {})
@@ -167,7 +181,16 @@ def main():
         mark_alert_sent(aid, log)
 
     save_alert_log(log, alert_log_file)
+    return any_fetch_success
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        success = main()
+        if success:
+            exit(0)
+        else:
+            exit(2)  # ran but failed logically
+    except Exception as e:
+        print(f"FATAL ERROR: {e}")
+        exit(1)  # crashed
