@@ -5,6 +5,7 @@ configs/*_alert_log.json
 configs/*_alert_types.json
 logs/*.state
 logs/*.last_success
+logs/*.active
 
 # Alert history
 alert_log.json

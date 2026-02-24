@@ -8,8 +8,10 @@ Each monitored site runs independently with duplicate alert suppression, state t
 ## Features
 - Multi-site monitoring using per-site configuration files
 - Filters alerts by type (configurable per site)
-- Duplicate suppression using alert ID tracking
-- Expiration filtering
+- Duplicate suppression across zones and service interrupts
+- Active alert tracking (detects when alerts expire or are cancelled)
+- All Clear notifications when hazards expire or are cancelled
+- API outage protection (prevents false clears during NWS outages)
 - Independent Slack routing per site
 - Operational monitoring channel for failures
 - Detects stalled or crashed scripts
@@ -24,16 +26,18 @@ Each monitored site runs independently with duplicate alert suppression, state t
 - Site-specific config defines zones and filtering behavior.
 - Alert types are toggled in a generated JSON file.
 - Slack notifications are sent via incoming webhooks.
-- Alert IDs are logged locally to prevent duplicate notifications.
+- Active alerts are tracked locally and compared between runs to detect new hazards and all-clear conditions.
 
 ## Process
 
 Every 2 minutes (per site):
 `run_site.sh`
     → queries NWS API
-    → filters alerts
-    → sends Slack messages (as needed)
-    → updates logs
+    → builds list of currently active alerts
+    → compares with previous run
+          NEW alerts → Slack notification
+          ENDED alerts → All Clear notification
+    → updates state files
     → updates heartbeat
 
 Every 1 minute:
@@ -49,11 +53,27 @@ Each site maintains a heartbeat file: `logs/AREA.last_success`. Every successful
 The monitor checks:
     current_time - last_success > threshold
 
-If exceeded → failure alert sent to OPS channel  
+If exceeded → failure alert sent to OPS channel
 If service resumes → recovery alert sent
 
 This prevents alert spam while still notifying operators of outages.
 
+## Alert State Tracking
+
+The system tracks alert lifecycle using two local files:
+
+- `AREA_alert_log.json`
+    Prevents duplicate notifications for the same alert version
+
+- `AREA_alert_log.json.active`
+    Stores currently active alerts from the last successful run
+
+On each execution the script compares current alerts vs previous state:
+
+NEW alert detected → Send alert notification
+Alert no longer present → Send *All Clear* notification
+
+If the NWS API fails completely, the previous state is preserved to prevent false clears.
 
 ## Project Structure
 
@@ -285,6 +305,11 @@ External uptime monitoring is required for full availability monitoring.
 
 **Receiving duplicate alerts**
 - Delete `AREA_alert_log.json` once (resets history)
+
+**Receiving unexpected All Clears**
+- NWS API may have breifly dropped the alert
+- Check logs for "All NWS fetched failed" warnings
+-The system suppresses clears during total API outage
 
 **Monitor reports stalled**
 - Confirm cron is running

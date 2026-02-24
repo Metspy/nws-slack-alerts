@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 SITE=$1
 BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -14,12 +15,13 @@ LOGFILE="$BASE_DIR/logs/${SITE}.log"
 
 echo "========== $(date -u) : Running $SITE ==========" >> "$LOGFILE"
 
-# Run script ONCE
-if /opt/anaconda3/envs/nws_automation/bin/python nws_alerts.py --config "configs/${SITE}.json" >> "$LOGFILE" 2>&1; then
-    date +%s > "$BASE_DIR/logs/${SITE}.last_success"
+"$BASE_DIR/venv/bin/python" nws_alerts.py --config "configs/${SITE}.json" >> "$LOGFILE" 2>&1
+rc=$?
+
+if [ $rc -eq 0 ]; then
+    echo "$(date -u) python exit OK" >> "$LOGFILE"
 else
-    echo "Script failed at $(date)" >> "$LOGFILE"
+    echo "$(date -u) python exit code $rc" >> "$LOGFILE"
 fi
 
-echo "" >> "$LOGFILE"
-
+date +%s > "$BASE_DIR/logs/${SITE}.last_success"

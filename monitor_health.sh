@@ -25,7 +25,7 @@ send_slack () {
 }
 
 SITES=("DST" "BNF" "SGP")
-MAX_AGE=600   # seconds (10 minutes)
+MAX_AGE=300   # seconds (5 minutes)
 
 for SITE in "${SITES[@]}"; do
 

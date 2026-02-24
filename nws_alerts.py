@@ -4,6 +4,8 @@ import argparse
 import json
 from datetime import datetime, timedelta, timezone
 import os
+import sys
+import traceback
 
 # === LOAD SITE CONFIG ===
 def load_site_config(config_path):
@@ -120,10 +122,46 @@ def fetch_alerts(area_code):
         print(f"ERROR fetching alerts for {area_code}: {e}")
         return [], False
 
+# === Alert ID Builder (Stable across zones) ===
+def build_alert_key(props):
+    """
+    Build a stable identifier for an NWS alert.
+    This remains contant across zones and API polls.
+    """
+    return "|".join([
+        props.get("event",""),
+        props.get("onset",""),
+        props.get("expires",""),
+        props.get("senderName",""),
+        props.get("headline","")
+    ])
 
 # === SLACK ===
 def send_alert_to_slack(props):
-    msg = f"*{props.get('event', 'Alert')}*\n{props.get('headline', '')}\n{props.get('description', '')}\nMore info: {props.get('id')}"
+    event = props.get("event", "Alert")
+    area = props.get("areaDesc", "Unknown location")
+    headline = props.get("headline", "")
+
+    severity = props.get("severity","")
+    certainty = props.get("certainty","")
+    urgency = props.get("urgency","")
+
+    triage = f"Severity: {severity} | Certainty: {certainty} | Urgency: {urgency}"
+
+    web_url = props.get("web","")
+    if web_url:
+        more_info = f"<{web_url}|View official NWS alert>"
+    else:
+        more_info = ""
+
+    msg = (
+        f"*{event}*\n"
+        f"{area}\n\n"
+        f"{triage}\n\n"
+        f"{headline}\n"
+        f"{description}\n\n"
+        f"{more_info}"
+    )
     r = requests.post(SLACK_WEBHOOK_URL, json={"text": msg})
     if r.status_code != 200:
         print(f"Slack error {r.status_code}: {r.text}")
@@ -135,7 +173,6 @@ def main():
     args = parser.parse_args()
 
     config = load_site_config(args.config)
-
     print(f"[{datetime.now(timezone.utc).isoformat()}] Checking alerts for {args.config}")
 
     areas = config["areas"]
@@ -143,32 +180,45 @@ def main():
     slack_webhook_url = os.getenv(config["webhook_env_var"])
     if not slack_webhook_url:
         raise ValueError("Slack webhook environment variable not set")
+
     alert_type_file = config["alert_type_file"]
     alert_log_file = config["alert_log_file"]
+    ACTIVE_STATE_FILE = alert_log_file + ".active"
 
-    global ALERT_EXPIRY_HOURS
+    global ALERT_EXPIRY_HOURS, ALERT_TYPE_FILE, SLACK_WEBHOOK_URL
     ALERT_EXPIRY_HOURS = alert_expiry_hours
-
-    global ALERT_TYPE_FILE
     ALERT_TYPE_FILE = alert_type_file
-
-    global SLACK_WEBHOOK_URL
     SLACK_WEBHOOK_URL = slack_webhook_url
 
     alert_flags = load_alert_type_flags()
     log = load_alert_log(alert_log_file, alert_expiry_hours)
+
+    # --- load previously active alerts ---
+    if os.path.exists(ACTIVE_STATE_FILE):
+        with open(ACTIVE_STATE_FILE, "r") as f:
+            previous_active = json.load(f)
+    else:
+        previous_active = {}
+
+    current_active = {}
     alerts = []
+    any_fetch_success = False
+
     for area in areas:
         area_alerts, ok = fetch_alerts(area)
-
         if ok:
             any_fetch_success = True
+        alerts.extend (area_alerts)
 
-        alerts.extend(area_alerts)
+    # if API failed completely, abort run without changing state
+    if not any_fetch_success:
+        print("WARNING: All NWS fetches failed - preserving previous state")
+        return True
 
+    # --- process alerts ---
     for alert in alerts:
         props = alert.get("properties", {})
-        aid = alert.get("id")
+        aid = build_alert_key(props)
         event = props.get("event", "")
 
         if not alert_flags.get(event, False):
@@ -181,26 +231,54 @@ def main():
 
         exp_iso = exp.replace("Z", "+00:00")
         et = datetime.fromisoformat(exp_iso)
-
         # skip expired alerts
         if et < datetime.now(timezone.utc):
             continue
 
-        # --- duplicate suppression ---
-        if has_been_alerted(aid, exp_iso, log):
-            continue
+        # strack active alert
+        current_active[aid] = {
+            "event": props.get("event","Unknown Alert"),
+            "sender": props.get("senderName", "NWS"),
+            "expires": exp_iso,
+            "headline": props.get("headline","")
+        }
 
-        # --- send alert ---
-        send_alert_to_slack(props)
-        mark_alert_sent(aid, exp_iso, log)
+        # send alert if new
+        if not has_been_alerted(aid, exp_iso, log):
+            send_alert_to_slack(props)
+            mark_alert_sent(aid, exp_iso, log)
+
+    # --- all clear detection ---
+    ended_alerts = set(previous_active.keys()) - set(current_active.keys())
+
+    for aid in ended_alerts:
+        info = previous_active.get(aid, {})
+        msg = (
+            f":white_check_mark: *All clear - {info.get('event','Alert')}*\n"
+            f"{info.get('headline','')}\n"
+            f"Issued by: {info.get('sender','NWS')}\n"
+            f"Expired: {info.get('expires','')}"
+        )
+        requests.post(SLACK_WEBHOOK_URL, json={"text":msg})
+
+    # Save current active alerts
+    save_alert_log(log, alert_log_file)
+    with open(ACTIVE_STATE_FILE, "w") as f:
+        json.dump(current_active, f, indent=2)
+
 
     return True
+
 
 if __name__ == "__main__":
     try:
         main()
-        exit(0)
-    except Exception as e:
-        print(f"FATAL ERROR: {e}")
-        exit(1)
-
+        print("STATUS: normal completion")
+        sys.exit(0)
+    except KeyboardInterrupt:
+        print("Status: interrupted")
+        sys.exit(0)
+    except Exception:
+        print("STATUS: runtime error but service still alive")
+        traceback.print_exc()
+        sys.exit(0)
