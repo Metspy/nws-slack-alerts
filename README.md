@@ -111,7 +111,7 @@ pip install -r requirements.txt
 
 ### 3. Configuration
 
-#### `AREA.json` - Each site has its own config file in `configs/`. Set areas according to note in [Features](#features). Ensure `webhook_env_var` matches an environment variable defined in your `.env` file (e.g., `"DST_SLACK_WEBHOOK"`).
+#### `AREA.json` - Each site has its own config file in `configs/`. The NWS issues alerts for specific areas known as Public Forecast Zones. Each state has its own set of codes and each zone is named using a two letter state name, "Z" for zone, and a 3 digit identifier. For example, Norman Oklahoma is in Public Forecast Zone OKZ029. You can browse a map of the Public Forecast Zones using the [NWS GIS data and the ArcGIS online MapViewer](https://www.arcgis.com/apps/mapviewer/index.html?url=https://mapservices.weather.noaa.gov/static/rest/services/nws_reference_maps/nws_reference_map/MapServer&source=sd). Be sure to turn on the "Public Forecast Zone" layer under "Weather Zone Forecasts"and to insert the "Z" into your zones when entering them into your `AREA.json` configuration file.  Ensure `webhook_env_var` matches an environment variable defined in your `.env` file (e.g., `"DST_SLACK_WEBHOOK"`).
 
 Example (`configs/DST.json`):
 
