@@ -28,15 +28,15 @@ def load_sites():
 
     return sites
 
+def load_alert_log(site):
 
-def load_alert_log():
+    path = f"state/{site}_alert_log.json"
 
     try:
-        with open("alert_log.json") as f:
+        with open(path) as f:
             return json.load(f)
     except:
         return {}
-
 
 def states_from_sites(sites):
 
@@ -69,7 +69,6 @@ def cutoff_time():
 def summarize():
 
     sites = load_sites()
-    sent_log = load_alert_log()
 
     cutoff = cutoff_time()
 
@@ -85,6 +84,8 @@ def summarize():
     lines.append("")
 
     for site, cfg in sites.items():
+
+        sent_log = load_alert_log(site)
 
         issued = []
         filtered = []
@@ -107,7 +108,14 @@ def summarize():
                 continue
 
             event = props["event"]
-            aid = a["id"]
+            aid = "|".join([
+               props.get("event",""),
+               props.get("onset",""),
+               props.get("expires",""),
+               props.get("senderName",""),
+               props.get("headline","")
+            ])
+
 
             issued.append(event)
 

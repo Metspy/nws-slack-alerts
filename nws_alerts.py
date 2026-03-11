@@ -265,6 +265,7 @@ def main():
 
         # send alert if new
         if not has_been_alerted(aid, exp_iso, log):
+            print(f"ALERT SENT: {event} | {props.get('areaDesc','')}")
             send_alert_to_slack(props)
             mark_alert_sent(aid, exp_iso, log)
 
