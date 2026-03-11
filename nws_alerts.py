@@ -273,6 +273,16 @@ def main():
 
     for aid in ended_alerts:
         info = previous_active.get(aid, {})
+        exp = info.get("expires")
+
+        if exp:
+            et = datetime.fromisoformat(exp)
+
+            # skip clears if expiration time has not yet passed
+            if et > datetime.now(timezone.utc):
+                print(f"Skipping premature cleat for {info.get('event')}")
+                continue
+
         msg = (
             f":white_check_mark: *All clear - {info.get('event','Alert')}*\n"
             f"{info.get('headline','')}\n"
