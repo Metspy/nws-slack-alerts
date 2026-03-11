@@ -1,0 +1,21 @@
+{
+  "areas": [
+    "MSZ006",
+    "MSZ017",
+    "MSZ024",
+    "ALZ002",
+    "ALZ011",
+    "ALZ012",
+    "ALZ004",
+    "ALZ014",
+    "ALZ013",
+    "ALZ015",
+    "ALZ007",
+    "ALZ016",
+    "ALZ005"
+  ],
+  "alert_expiry_hours": 12,
+  "alert_type_file": "configs/BNF_alert_types.json",
+  "alert_log_file": "configs/BNF_alert_log.json",
+  "webhook_env_var": "BNF_SLACK_WEBHOOK"
+}

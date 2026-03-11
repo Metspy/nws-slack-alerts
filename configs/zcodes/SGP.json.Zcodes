@@ -1,0 +1,12 @@
+{
+  "areas": [
+    "OKZ008",
+    "OKZ007",
+    "OKZ012",
+    "OKZ013"
+  ],
+  "alert_expiry_hours": 12,
+  "alert_type_file": "configs/SGP_alert_types.json",
+  "alert_log_file": "configs/SGP_alert_log.json",
+  "webhook_env_var": "SGP_SLACK_WEBHOOK"
+}

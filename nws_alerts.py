@@ -7,6 +7,8 @@ import os
 import sys
 import traceback
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # === LOAD SITE CONFIG ===
 def load_site_config(config_path):
     with open(config_path, "r") as f:
@@ -103,8 +105,8 @@ def mark_alert_sent(aid, expires_iso, log):
     log[aid] = expires_iso
 
 # === FETCH ALERTS ===
-def fetch_alerts(area_code):
-    url = f"https://api.weather.gov/alerts/active?zone={area_code}"
+def fetch_state_alerts(state):
+    url = f"https://api.weather.gov/alerts/active?area={state}"
 
     try:
         response = requests.get(
@@ -115,11 +117,11 @@ def fetch_alerts(area_code):
         response.raise_for_status()
 
         features = response.json().get("features", [])
-        print(f"Fetched {len(features)} active alerts for {area_code}")
+        print(f"Fetched {len(features)} active alerts for state {state}")
         return features, True
 
     except Exception as e:
-        print(f"ERROR fetching alerts for {area_code}: {e}")
+        print(f"ERROR fetching alerts for state {state}: {e}")
         return [], False
 
 # === Alert ID Builder (Stable across zones) ===
@@ -141,6 +143,7 @@ def send_alert_to_slack(props):
     event = props.get("event", "Alert")
     area = props.get("areaDesc", "Unknown location")
     headline = props.get("headline", "")
+    description = props.get("description", "")
 
     severity = props.get("severity","")
     certainty = props.get("certainty","")
@@ -172,17 +175,20 @@ def main():
     parser.add_argument("--config", required=True, help="Path to site config JSON")
     args = parser.parse_args()
 
-    config = load_site_config(args.config)
+    config_path = os.path.join(SCRIPT_DIR, args.config)
+    config = load_site_config(config_path)
     print(f"[{datetime.now(timezone.utc).isoformat()}] Checking alerts for {args.config}")
 
     areas = config["areas"]
+    states = sorted({a[:2] for a in areas})
+    print(f"Polling NWS alerts for states: {states}")
     alert_expiry_hours = config.get("alert_expiry_hours", 12)
     slack_webhook_url = os.getenv(config["webhook_env_var"])
     if not slack_webhook_url:
         raise ValueError("Slack webhook environment variable not set")
 
-    alert_type_file = config["alert_type_file"]
-    alert_log_file = config["alert_log_file"]
+    alert_type_file = os.path.join(SCRIPT_DIR, config["alert_type_file"])
+    alert_log_file = os.path.join(SCRIPT_DIR, config["alert_log_file"])
     ACTIVE_STATE_FILE = alert_log_file + ".active"
 
     global ALERT_EXPIRY_HOURS, ALERT_TYPE_FILE, SLACK_WEBHOOK_URL
@@ -204,20 +210,34 @@ def main():
     alerts = []
     any_fetch_success = False
 
-    for area in areas:
-        area_alerts, ok = fetch_alerts(area)
+    for state in states:
+        state_alerts, ok = fetch_state_alerts(state)
         if ok:
             any_fetch_success = True
-        alerts.extend (area_alerts)
+        alerts.extend (state_alerts)
 
     # if API failed completely, abort run without changing state
     if not any_fetch_success:
         print("WARNING: All NWS fetches failed - preserving previous state")
         return True
 
+    unique = {}
+    for a in alerts:
+        key = build_alert_key(a.get("properties", {}))
+        unique[key] = a
+
+    alerts = list(unique.values())
+
+    print(f"Processing {len(alerts)} unique alerts")
+
     # --- process alerts ---
     for alert in alerts:
         props = alert.get("properties", {})
+
+        ugc = set(props.get("geocode", {}).get("UGC", []))
+        if not ugc.intersection(set(areas)):
+            continue
+
         aid = build_alert_key(props)
         event = props.get("event", "")
 

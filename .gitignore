@@ -1,26 +1,23 @@
-# Log files
+# Python
+__pycache__/
+*.py[cod]
+
+# virtual environment
+venv/
+
+# environment secrets
+.env
+
+# runtime state
+state/*.json
+state/*.active
+
+# logs
 cron.log
 logs/*.log
-configs/*_alert_log.json
-configs/*_alert_types.json
-logs/*.state
 logs/*.last_success
 logs/*.active
 
-# Alert history
-alert_log.json
-
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-
-# OS and editor files
+# OS / editor junk
 .DS_Store
 *.swp
-
-# Environment files
-.env
-venv/
-
-
