@@ -4,7 +4,7 @@ import glob
 import os
 from datetime import datetime, timedelta, timezone
 
-API = "https://api.weather.gov/alerts/active"
+API = "https://api.weather.gov/alerts"
 HEADERS = {"User-Agent": "nws-alert-summary"}
 
 OPS_WEBHOOK_ENV = "OPS_SLACK_WEBHOOK"
@@ -21,12 +21,20 @@ def load_sites():
 
         name = os.path.basename(f).replace(".json","")
 
+        # load alert type configuration
+        try:
+            with open(cfg["alert_type_file"]) as af:
+                alert_types = json.load(af)
+        except:
+            alert_types = {}
+
         sites[name] = {
             "areas": set(cfg.get("areas", [])),
-            "alert_types": cfg.get("alert_types", {})
+            "alert_types": alert_types
         }
 
     return sites
+
 
 def load_alert_log(site):
 
@@ -37,6 +45,7 @@ def load_alert_log(site):
             return json.load(f)
     except:
         return {}
+
 
 def states_from_sites(sites):
 
@@ -66,6 +75,17 @@ def cutoff_time():
     return datetime.now(timezone.utc) - timedelta(hours=24)
 
 
+def build_alert_key(props):
+
+    return "|".join([
+        props.get("event",""),
+        props.get("onset",""),
+        props.get("expires",""),
+        props.get("senderName",""),
+        props.get("headline","")
+    ])
+
+
 def summarize():
 
     sites = load_sites()
@@ -87,9 +107,12 @@ def summarize():
 
         sent_log = load_alert_log(site)
 
-        issued = []
-        filtered = []
-        sent = []
+        issued = 0
+        sent = 0
+        filtered = 0
+
+        event_counts = {}
+        event_filtered = {}
 
         for a in alerts:
 
@@ -108,30 +131,38 @@ def summarize():
                 continue
 
             event = props["event"]
-            aid = "|".join([
-               props.get("event",""),
-               props.get("onset",""),
-               props.get("expires",""),
-               props.get("senderName",""),
-               props.get("headline","")
-            ])
+            aid = build_alert_key(props)
 
-
-            issued.append(event)
+            issued += 1
+            event_counts[event] = event_counts.get(event, 0) + 1
 
             if not cfg["alert_types"].get(event, False):
-                filtered.append(event)
+                filtered += 1
+                event_filtered[event] = True
                 continue
 
             if aid in sent_log:
-                sent.append(event)
+                sent += 1
+
+        missed = issued - sent - filtered
 
         lines.append(f"*SITE: {site}*")
-        lines.append(f"Issued: {len(issued)} | Sent: {len(sent)} | Filtered: {len(filtered)}")
+        lines.append(
+            f"Issued: {issued} | Sent: {sent} | Filtered: {filtered} | Missed: {missed}"
+        )
 
-        if issued:
-            for e in sorted(set(issued)):
-                lines.append(f"• {e}")
+        if event_counts:
+
+            for event in sorted(event_counts):
+
+                count = event_counts[event]
+
+                label = f"• {event} ({count})"
+
+                if event_filtered.get(event):
+                    label += " (Filtered)"
+
+                lines.append(label)
 
         lines.append("")
 
