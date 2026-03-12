@@ -289,6 +289,8 @@ Only alerts marked **true** will trigger Slack notifications.
 
 # Running Automatically (Cron)
 
+To enable cron to properly parse the Slack webhooks stored in `.env`, a wrapper script, `run_site.sh` is employed which sets the variables before executing `nws_alerts.py`.
+
 Example cron configuration:
 
 ```id="cron-example"
@@ -298,7 +300,7 @@ Example cron configuration:
 * * * * * /path/nws-slack-alerts/monitor_health.sh
 ```
 
-Each site runs independently, and the health monitor reports failures only when a state change occurs.
+Each site runs independently, and the health monitor reports failures only when a state change occurs. The above example runs each site every 2 minutes.
 
 ---
 
@@ -392,23 +394,23 @@ The script will:
 3. Compare them with locally recorded alert history
 4. Generate a reconciliation summary
 
-The summary is printed to the console and sent to the OPS Slack webhook if configured.
+The summary is printed to the console and sent to the OPS Slack webhook (if configured).
 
 ---
 
 Running the Digest Automatically
 
-You may schedule the digest to run once per day using cron.
+You may schedule the digest to run once per day using cron. A wrapper script `run_daily_summary.sh` is included in the repo and acts simlilarly to `run_site.sh` by setting the variables in `.env` prior to execution.
 
 Example:
 
 ```id="daily-summary-cron"
-0 13 * * * /your/path/to/nws-slack-alerts/venv/bin/python /your/path/to/nws-slack-alerts/tools/daily_alert_summary.py
+0 12 * * * /bin/bash /your/path/to/nws-slack-alerts/run_daily_summary.sh
 ```
 
-This example runs the digest daily at 13:00 UTC (8 AM Central Time).
+This example runs the digest daily at 12:00 UTC daily.
 
-The report will be posted to the OPS monitoring Slack channel.
+The report will be posted to the OPS monitoring Slack channel (or a Slack channel of your choice; simply edit `OPS_WEBHOOK_ENV = "OPS_SLACK_WEBHOOK"` in `daily_alert_summary.py` to point to the `ALERTMON_SLACK_WEBHOOK` variable you have defined in your `.env`.
 
 ---
 
