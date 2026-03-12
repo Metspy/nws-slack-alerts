@@ -107,7 +107,7 @@ cron
 
 ```id="project-structure"
 nws-slack-alerts/
-├── configs/            # Per-site configuration [^1]
+├── configs/            # Per-site configuration (Note 1)
 │   ├── DST.json
 │   ├── BNF.json
 │   └── SGP.json
@@ -119,7 +119,7 @@ nws-slack-alerts/
 ├── logs/               # Runtime logs and heartbeat files
 │
 ├── tools/              # Helper utilities
-│   ├── expand_zone_to_county.py              # [^2]
+│   ├── expand_zone_to_county.py              # (Note 2)
 │   └── daily_alert_summary.py
 │
 ├── nws_alerts.py       # Main alert processor
@@ -129,8 +129,8 @@ nws-slack-alerts/
 └── requirements.txt
 ```
 
-[^1]: This repository is pre-populated with 3 `SITE.json` configuration files unique to areas of interest to the author. Feel free to use these configuration files to test your build.
-[^2]: This project was first written to query NWS Public Forecast Zones ("Z codes") for Watches, Warnings and Advisory (WWA) products. In practice, many alerts are issued instead using a Universal Geographic Code (UGC) which is the NWS equivalent of the FIPS standard. This is formatted with a two letter state abbreviation, "C" for county, and the counties FIPS number. A list of all state FIPS codes can be found on the [US Census Bureau Website](https://www.census.gov/geographies/reference-files/2019/demo/popest/2019-fips.html). If you would like, or if you have already done so based on the previous release, you can build your SITE.json using the "Z codes" and use the `expand_zone_to_county.py` script to expand the configuration to include the "C codes". To do so, simply rename `SITE.json` to `SITE.json.Zcodes` and run `python tools/expand_zone_to_county.py configs/SITE.json.Zcodes`. Just be sure to remove `*.Zcodes` once you have confirmed your new configuration file. You can explore the NWS County and Zone borders using the NWS ArcGIS Online Map viewer linked on the [NWS Reference Map MapServer page](https://mapservices.weather.noaa.gov/static/rest/services/nws_reference_maps/nws_reference_map/MapServer) to help identify the codes that are right for your implementation. You can read more about NWS GIS products on the [NWS GIS Portal](https://www.weather.gov/gis).
+(Note 1): This repository is pre-populated with 3 `SITE.json` configuration files unique to areas of interest to the author. Feel free to use these configuration files to test your build.
+(Note 2): This project was first written to query NWS Public Forecast Zones ("Z codes") for Watches, Warnings and Advisory (WWA) products. In practice, many alerts are issued instead using a Universal Geographic Code (UGC) which is the NWS equivalent of the FIPS standard. This is formatted with a two letter state abbreviation, "C" for county, and the counties FIPS number. A list of all state FIPS codes can be found on the [US Census Bureau Website](https://www.census.gov/geographies/reference-files/2019/demo/popest/2019-fips.html). If you would like, or if you have already done so based on the previous release, you can build your SITE.json using the "Z codes" and use the `expand_zone_to_county.py` script to expand the configuration to include the "C codes". To do so, simply rename `SITE.json` to `SITE.json.Zcodes` and run `python tools/expand_zone_to_county.py configs/SITE.json.Zcodes`. Just be sure to remove `*.Zcodes` once you have confirmed your new configuration file. You can explore the NWS County and Zone borders using the NWS ArcGIS Online Map viewer linked on the [NWS Reference Map MapServer page](https://mapservices.weather.noaa.gov/static/rest/services/nws_reference_maps/nws_reference_map/MapServer) to help identify the codes that are right for your implementation. You can read more about NWS GIS products on the [NWS GIS Portal](https://www.weather.gov/gis).
 ---
 
 # Configuring NWS Zones and Counties
@@ -203,11 +203,11 @@ Example configuration:
   "alert_expiry_hours": 12,
   "alert_type_file": "alert_types/SITE_alert_types.json",
   "alert_log_file": "state/SITE_alert_log.json",
-  "webhook_env_var": "SITE_SLACK_WEBHOOK" # [^1]
+  "webhook_env_var": "SITE_SLACK_WEBHOOK" # (Note 3)
 }
 ```
 
-[1^]: You must update your .env to include `SITE_SLACK_WEBHOOK` or your alerts will not know where to go and you will get the error "Slack webhook environment variable not set". See `.env.example` in [Quick Start](#quick-start). Don't forget to then reset your environment variables.
+(Note 3): You must update your .env to include `SITE_SLACK_WEBHOOK` or your alerts will not know where to go and you will get the error "Slack webhook environment variable not set". See `.env.example` in [Quick Start](#quick-start). Don't forget to then reset your environment variables.
 
 >**IMPORTANT: If you wish to contribute to this project, be sure to protect your Slack webhook links by assuring that they are only stored in .env and that .env is included in your .gitignore.**
 ---
@@ -329,9 +329,9 @@ This script compares alerts issued by the NWS against the alerts processed by th
 
 The digest is useful for verifying that:
 
-*All expected alerts were detected
-*Alert filtering is working as intended
-*No alerts were missed due to script errors or API outages
+* All expected alerts were detected
+* Alert filtering is working as intended
+* No alerts were missed due to script errors or API outages
 
 The script automatically reads all site configuration files in `configs/` and compares them against the local alert state files stored in `state/`.
 
@@ -350,10 +350,10 @@ The following relationship should normally hold: Issued = Sent + Filtered + Miss
 
 A non-zero Missed value may indicate:
 
-*A temporary NWS API outage
-*A script runtime error
-*A configuration problem
-*A cron scheduling issue
+* A temporary NWS API outage
+* A script runtime error
+* A configuration problem
+* A cron scheduling issue
 
 ---
 
