@@ -138,6 +138,22 @@ def build_alert_key(props):
         props.get("headline","")
     ])
 
+# === Build IEM Link ===
+def build_vtec_url(props):
+    vtec_list = props.get("parameters", {}).get("VTEC", [])
+    if not vtec_list:
+        return props.get("@id") or props.get("web", "")
+
+    vtec = vtec_list[0].strip("/")
+    parts = vtec.split(".")
+    if len(parts) < 6:
+        return props.get("@id") or props.get("web", "")
+
+    year = props.get("sent", "")[:4]
+    cls, action, office, phenom, sig, etn = parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]
+
+    return f"https://mesonet.agron.iastate.edu/vtec/#{year}-{cls}-{action}-{office}-{phenom}-{sig}-{etn}"
+
 # === SLACK ===
 def send_alert_to_slack(props):
     event = props.get("event", "Alert")
@@ -151,11 +167,8 @@ def send_alert_to_slack(props):
 
     triage = f"Severity: {severity} | Certainty: {certainty} | Urgency: {urgency}"
 
-    web_url = props.get("web","")
-    if web_url:
-        more_info = f"<{web_url}|View official NWS alert>"
-    else:
-        more_info = ""
+    vtec_url = build_vtec_url(props)
+    more_info = f"<{vtec_url}|View alert on IEM>" if vtec_ url else ""
 
     msg = (
         f"*{event}*\n"
