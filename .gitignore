@@ -21,3 +21,9 @@ logs/*.active
 # OS / editor junk
 .DS_Store
 *.swp
+
+*.bak
+*.bak2
+*.pi
+logs/*.state
+logs/.gitkeep
