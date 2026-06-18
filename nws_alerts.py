@@ -168,7 +168,7 @@ def send_alert_to_slack(props):
     triage = f"Severity: {severity} | Certainty: {certainty} | Urgency: {urgency}"
 
     vtec_url = build_vtec_url(props)
-    more_info = f"<{vtec_url}|View alert on IEM>" if vtec_ url else ""
+    more_info = f"<{vtec_url}|View alert on IEM>" if vtec_url else ""
 
     msg = (
         f"*{event}*\n"
